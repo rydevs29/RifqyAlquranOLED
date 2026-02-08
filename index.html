@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rifqy Al-Quran OLED Pro</title>
+    <meta name="theme-color" content="#000000">
+    <meta name="description" content="Ultimate OLED Quran with Pro Tajwid">
+    
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* --- CORE OLED THEME --- */
+        :root {
+            --bg-oled: #000000;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --accent-gold: #FFD700;
+            --accent-pink: #FF69B4;  /* Ghunnah */
+            --accent-cyan: #00FFFF;  /* Qalqalah */
+            --accent-red: #FF4500;   /* Mad */
+            --accent-green: #32CD32; /* Iqlab */
+            --accent-orange: #FFA500;/* Ikhfa/Idgham */
+            --glass: rgba(20, 20, 20, 0.95);
+            --border: 1px solid #333;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            background-color: var(--bg-oled);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0; padding: 0;
+            overflow-x: hidden;
+            height: 100vh;
+            display: flex; flex-direction: column;
+        }
+
+        /* --- TYPOGRAPHY & ARABIC --- */
+        .arabic-text {
+            font-family: 'Amiri', serif;
+            font-size: 28px; /* Default size */
+            line-height: 2.2;
+            text-align: right;
+            direction: rtl;
+            font-weight: 400;
+            padding: 10px 0;
+        }
+        
+        /* --- TAJWID COLORS & GLOW --- */
+        .t-allah { color: var(--accent-gold); text-shadow: 0 0 5px rgba(255, 215, 0, 0.3); cursor: pointer; }
+        .t-ghunnah { color: var(--accent-pink); text-shadow: 0 0 5px rgba(255, 105, 180, 0.3); cursor: pointer; }
+        .t-qalqalah { color: var(--accent-cyan); text-shadow: 0 0 5px rgba(0, 255, 255, 0.3); cursor: pointer; }
+        .t-mad { color: var(--accent-red); text-shadow: 0 0 5px rgba(255, 69, 0, 0.3); cursor: pointer; }
+        .t-iqlab { color: var(--accent-green); text-shadow: 0 0 5px rgba(50, 205, 50, 0.3); cursor: pointer; }
+        .t-ikhfa { color: var(--accent-orange); text-shadow: 0 0 5px rgba(255, 165, 0, 0.3); cursor: pointer; }
+        
+        /* --- LAYOUT --- */
+        #app-container { flex: 1; overflow-y: auto; scroll-behavior: smooth; position: relative; padding-bottom: 120px; }
+        
+        /* Header */
+        header {
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            position: sticky; top: 0; z-index: 100;
+            padding: 15px;
+            border-bottom: 1px solid #222;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .header-title h1 { margin: 0; font-size: 18px; color: var(--accent-gold); }
+        .header-title small { font-size: 11px; color: var(--text-secondary); }
+        .header-icons i { font-size: 18px; margin-left: 20px; color: var(--text-primary); cursor: pointer; }
+
+        /* Surah List */
+        .surah-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #111;
+            transition: 0.2s;
+        }
+        .surah-item:active { background: #111; }
+        .surah-number { 
+            width: 35px; height: 35px; 
+            border: 1px solid var(--accent-gold); border-radius: 50%; 
+            display: flex; justify-content: center; align-items: center;
+            font-size: 12px; color: var(--accent-gold); margin-right: 15px;
+        }
+        .surah-info h3 { margin: 0; font-size: 16px; font-weight: 600; }
+        .surah-info p { margin: 2px 0 0; font-size: 12px; color: var(--text-secondary); }
+        .surah-arabic { font-family: 'Amiri', serif; font-size: 20px; color: var(--accent-gold); }
+
+        /* Reading View */
+        .ayah-container {
+            padding: 20px;
+            border-bottom: 1px solid #1a1a1a;
+            position: relative;
+        }
+        .ayah-container.active-ayah {
+            background: rgba(255, 215, 0, 0.05); /* Highlight saat audio putar */
+            border-left: 3px solid var(--accent-gold);
+        }
+        .ayah-actions {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; background: #0a0a0a; padding: 5px 10px; border-radius: 8px;
+        }
+        .ayah-badge { font-size: 12px; color: var(--accent-gold); font-weight: bold; }
+        .action-btn { background: none; border: none; color: #555; font-size: 14px; margin-left: 10px; cursor: pointer; }
+        .action-btn:active { color: var(--accent-gold); }
+        .sajdah-icon { color: var(--accent-gold); margin-right: 5px; }
+
+        .translation { font-size: 14px; color: #ccc; line-height: 1.6; margin-top: 10px; }
+        
+        /* Floating Player */
+        #audio-player-bar {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: rgba(10, 10, 10, 0.98);
+            border-top: 1px solid var(--accent-gold);
+            padding: 10px 20px;
+            z-index: 200;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+        }
+        .player-info { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .player-controls { display: flex; justify-content: center; align-items: center; gap: 20px; }
+        .ctrl-btn { background: none; border: none; color: white; font-size: 20px; }
+        .play-btn { width: 50px; height: 50px; background: var(--accent-gold); border-radius: 50%; color: black; display: flex; align-items: center; justify-content: center; }
+        
+        /* Modals & Popups */
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 300;
+            display: none; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: #111; width: 90%; max-height: 80%; overflow-y: auto;
+            border-radius: 15px; padding: 20px; border: 1px solid #333;
+        }
+        .modal-header { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+        .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .feature-card { background: #1a1a1a; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #222; }
+        .feature-card i { font-size: 24px; color: var(--accent-gold); margin-bottom: 10px; }
+
+        /* Tajwid Tooltip */
+        #tajwid-tooltip {
+            position: fixed;
+            background: rgba(20, 20, 20, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--accent-gold);
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 999;
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+            max-width: 200px;
+            text-align: center;
+        }
+
+        /* Night Vision (Red Overlay) */
+        #night-vision-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 0, 0, 0.15);
+            pointer-events: none; z-index: 9999;
+            display: none;
+            mix-blend-mode: multiply;
+        }
+        
+        /* Utility Classes */
+        .hidden { display: none !important; }
+        .btn-gold { background: var(--accent-gold); color: black; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; width: 100%; margin-top: 10px; }
+        input[type="range"] { width: 100%; accent-color: var(--accent-gold); }
+
+        /* Progress Bar Khatam */
+        #khatam-progress { height: 2px; background: #222; width: 100%; position: fixed; top: 0; z-index: 101; }
+        #khatam-bar { height: 100%; background: var(--accent-gold); width: 0%; transition: 0.5s; }
+
+    </style>
+</head>
+<body>
+
+    <div id="night-vision-overlay"></div>
+
+    <div id="khatam-progress"><div id="khatam-bar"></div></div>
+
+    <header id="main-header">
+        <div class="header-icons" onclick="showView('home')">
+            <i class="fas fa-arrow-left" id="back-btn" style="display:none; margin-left:0; margin-right:15px;"></i>
+        </div>
+        <div class="header-title" id="header-text">
+            <h1>Rifqy Al-Quran</h1>
+            <small id="prayer-countdown">Menghitung waktu sholat...</small>
+        </div>
+        <div class="header-icons">
+            <i class="fas fa-mosque" onclick="openModal('toolbox')"></i>
+            <i class="fas fa-cog" onclick="openModal('settings')"></i>
+        </div>
+    </header>
+
+    <div id="app-container">
+        <div id="view-home">
+            <div style="padding: 15px; background: #0a0a0a; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <span style="font-size: 12px; color: var(--accent-gold);"><i class="fas fa-sun"></i> Syuruq: <span id="syuruq-time">--:--</span></span>
+                </div>
+                <div>
+                    <span style="font-size: 12px; color: var(--text-secondary);"><i class="fas fa-cloud-sun"></i> Dhuha: <span id="dhuha-time">--:--</span></span>
+                </div>
+            </div>
+
+            <div style="display: flex; border-bottom: 1px solid #333;">
+                <div onclick="switchTab('surah')" class="tab-btn active-tab" style="flex:1; text-align:center; padding:15px; color:var(--accent-gold); border-bottom:2px solid var(--accent-gold);">Surah</div>
+                <div onclick="switchTab('juz')" class="tab-btn" style="flex:1; text-align:center; padding:15px; color:#555;">Juz</div>
+            </div>
+
+            <div id="surah-list-container">
+                <div style="text-align:center; padding:50px; color:#555;">Memuat Data Al-Quran...</div>
+            </div>
+            <div id="juz-list-container" class="hidden">
+                </div>
+        </div>
+
+        <div id="view-read" class="hidden">
+            <div id="ayat-list-container">
+                </div>
+        </div>
+    </div>
+
+    <div id="audio-player-bar">
+        <div class="player-info">
+            <span id="player-title" style="font-size: 12px; color: var(--accent-gold);">Al-Fatihah : 1</span>
+            <span id="player-timer" style="font-size: 12px; color: #fff;">00:00</span>
+        </div>
+        <div class="player-controls">
+            <button class="ctrl-btn" onclick="prevAudio()"><i class="fas fa-step-backward"></i></button>
+            <button class="play-btn" onclick="togglePlay()"><i class="fas fa-play" id="play-icon"></i></button>
+            <button class="ctrl-btn" onclick="nextAudio()"><i class="fas fa-step-forward"></i></button>
+            <button class="ctrl-btn" onclick="openSpeedMenu()" style="font-size:14px;">1.0x</button>
+        </div>
+        <div style="width:100%; height:3px; background:#333; margin-top:10px; position:relative;">
+            <div id="audio-progress" style="width:0%; height:100%; background:var(--accent-gold);"></div>
+        </div>
+    </div>
+
+    <div id="tajwid-tooltip"></div>
+
+    <div id="modal-toolbox" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Toolbox Islami</h3>
+                <i class="fas fa-times" onclick="closeModal('toolbox')"></i>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card" onclick="openSubModal('tasbih')">
+                    <i class="fas fa-fingerprint"></i><br>Tasbih Digital
+                </div>
+                <div class="feature-card" onclick="openSubModal('doa')">
+                    <i class="fas fa-hands-praying"></i><br>Doa Harian
+                </div>
+                <div class="feature-card" onclick="openSubModal('zakat')">
+                    <i class="fas fa-calculator"></i><br>Zakat & Sedekah
+                </div>
+                <div class="feature-card" onclick="openSubModal('asmaul')">
+                    <i class="fas fa-star"></i><br>Asmaul Husna
+                </div>
+                <div class="feature-card" onclick="openSubModal('jadwal')">
+                    <i class="fas fa-clock"></i><br>Jadwal Sholat
+                </div>
+                <div class="feature-card" onclick="openSubModal('kiblat')">
+                    <i class="fas fa-compass"></i><br>Arah Kiblat
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-settings" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Pengaturan</h3>
+                <i class="fas fa-times" onclick="closeModal('settings')"></i>
+            </div>
+            
+            <p style="color:var(--accent-gold); font-size:14px; margin-bottom:5px;">TAJWID PRO (Quran.nu Logic)</p>
+            <label style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #222;">
+                <span>Aktifkan Warna Tajwid</span>
+                <input type="checkbox" id="toggle-tajwid" checked onchange="toggleTajwid()">
+            </label>
+
+            <p style="color:var(--accent-gold); font-size:14px; margin-top:20px; margin-bottom:5px;">AUDIO</p>
+            <label style="display:block; padding:10px 0;">
+                <span>Sleep Timer (Auto-Stop)</span>
+                <select id="sleep-timer" style="width:100%; background:#222; color:white; border:none; padding:8px; margin-top:5px; border-radius:5px;">
+                    <option value="0">Matikan</option>
+                    <option value="15">15 Menit</option>
+                    <option value="30">30 Menit</option>
+                    <option value="60">60 Menit</option>
+                </select>
+            </label>
+
+            <p style="color:var(--accent-gold); font-size:14px; margin-top:20px; margin-bottom:5px;">TAMPILAN</p>
+            <label style="display:block; padding:10px 0;">
+                <span>Ketebalan Font Arab</span>
+                <input type="range" min="300" max="900" step="100" value="400" oninput="updateFontWeight(this.value)">
+            </label>
+            <label style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #222;">
+                <span>Keep Screen On (Layar Nyala)</span>
+                <input type="checkbox" id="toggle-wakelock" onchange="toggleWakeLock()">
+            </label>
+            <label style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #222;">
+                <span>Night Vision (Filter Merah)</span>
+                <input type="checkbox" onchange="toggleNightVision(this.checked)">
+            </label>
+        </div>
+    </div>
+
+    <div id="modal-doa" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Kumpulan Doa</h3>
+                <i class="fas fa-arrow-left" onclick="closeModal('doa')"></i>
+            </div>
+            <div id="doa-list">
+                </div>
+        </div>
+    </div>
+
+    <div id="modal-tasbih" class="modal">
+        <div class="modal-content" style="text-align:center;">
+            <div class="modal-header"><h3>Tasbih Digital</h3><i class="fas fa-arrow-left" onclick="closeModal('tasbih')"></i></div>
+            <div style="font-size:80px; font-weight:bold; color:var(--accent-gold); margin:40px 0;" id="tasbih-count">0</div>
+            <button onclick="countTasbih()" style="width:150px; height:150px; border-radius:50%; background:#222; border:2px solid var(--accent-gold); color:white; font-size:24px;">TEKAN</button>
+            <br><br>
+            <button onclick="resetTasbih()" style="background:none; border:1px solid #333; color:#555; padding:5px 15px; border-radius:10px;">Reset</button>
+        </div>
+    </div>
+
+    <div id="modal-zakat" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Zakat & Sedekah</h3><i class="fas fa-arrow-left" onclick="closeModal('zakat')"></i></div>
+            <div style="background:#1a1a1a; padding:10px; border-left:3px solid var(--accent-green); margin-bottom:20px; font-size:12px; color:#ccc;">
+                <i class="fas fa-quote-left"></i> <span id="sedekah-quote">Sedekah tidaklah mengurangi harta.</span>
+            </div>
+            <label>Total Harta (Rp)</label>
+            <input type="number" id="zakat-input" style="width:100%; padding:10px; background:#222; border:none; color:white; margin-bottom:10px;">
+            <button onclick="calcZakat()" class="btn-gold">Hitung Zakat (2.5%)</button>
+            <div id="zakat-result" style="margin-top:20px; font-size:20px; text-align:center; color:var(--accent-gold);"></div>
+        </div>
+    </div>
+
+    <audio id="quran-audio" preload="auto"></audio>
+
+<script>
+    // --- GLOBAL STATE ---
+    const STATE = {
+        surahs: [],
+        currentSurah: null,
+        currentAyahIndex: 0, // 0-based index dalam array ayat
+        audioPlaying: false,
+        audioSpeed: 1.0,
+        settings: {
+            tajwid: true,
+            fontSize: 28,
+            fontWeight: 400,
+            wakeLock: false,
+            autoStop: 0 // minutes
+        },
+        prayerTimes: null,
+        wakeLockSentinel: null
+    };
+
+    // --- INIT ---
+    document.addEventListener('DOMContentLoaded', async () => {
+        loadSettings();
+        renderHome();
+        initPrayerTimes();
+        setupAudioEvents();
+        checkKhatamProgress();
+        document.getElementById('header-text').innerHTML = `<h1>Rifqy Al-Quran</h1><small>Memuat data...</small>`;
+        
+        // Fetch Surah List (Lightweight)
+        try {
+            const response = await fetch('https://equran.id/api/v2/surat');
+            const data = await response.json();
+            STATE.surahs = data.data;
+            renderSurahList(STATE.surahs);
+            renderJuzList(); // Initialize Juz Tab
+            document.getElementById('header-text').innerHTML = `<h1>Rifqy Al-Quran</h1><small>${getHijriDate()}</small>`;
+        } catch (e) {
+            alert("Gagal memuat data. Periksa internet.");
+        }
+    });
+
+    // --- RENDER FUNCTIONS ---
+    function renderSurahList(list) {
+        const container = document.getElementById('surah-list-container');
+        container.innerHTML = list.map(s => `
+            <div class="surah-item" onclick="openSurah(${s.nomor}, '${s.namaLatin}')">
+                <div style="display:flex; align-items:center;">
+                    <div class="surah-number">${s.nomor}</div>
+                    <div class="surah-info">
+                        <h3>${s.namaLatin}</h3>
+                        <p>${s.arti} • ${s.jumlahAyat} Ayat</p>
+                    </div>
+                </div>
+                <div class="surah-arabic">${s.nama}</div>
+            </div>
+        `).join('');
+    }
+
+    function renderJuzList() {
+        const container = document.getElementById('juz-list-container');
+        let html = '';
+        for (let i = 1; i <= 30; i++) {
+            html += `
+            <div class="surah-item" onclick="alert('Fitur navigasi Juz akan mengarah ke awal Juz ${i}')">
+                <div style="display:flex; align-items:center;">
+                    <div class="surah-number" style="border-color:#555; color:#fff;">${i}</div>
+                    <div class="surah-info"><h3>Juz ${i}</h3><p>Mulai Baris Baru</p></div>
+                </div>
+            </div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    // --- CORE: OPEN SURAH & TAJWID ENGINE ---
+    async function openSurah(nomor, nama) {
+        // UI Switching
+        document.getElementById('view-home').classList.add('hidden');
+        document.getElementById('view-read').classList.remove('hidden');
+        document.getElementById('back-btn').style.display = 'block';
+        document.getElementById('header-text').innerHTML = `<h1>${nama}</h1><small>Memuat ayat...</small>`;
+        
+        // Cek Cache LocalStorage (Smart Memory - Scroll Position)
+        const lastScroll = localStorage.getItem(`scroll_surah_${nomor}`);
+
+        try {
+            const res = await fetch(`https://equran.id/api/v2/surat/${nomor}`);
+            const data = await res.json();
+            STATE.currentSurah = data.data;
+            
+            renderAyat(data.data.ayat);
+            
+            document.getElementById('header-text').innerHTML = `<h1>${data.data.namaLatin}</h1><small>${data.data.arti} • ${data.data.tempatTurun}</small>`;
+            
+            // Auto-Scroll Smart Memory
+            if (lastScroll) {
+                setTimeout(() => {
+                    document.getElementById('app-container').scrollTop = parseInt(lastScroll);
+                }, 500);
+            }
+        } catch (e) {
+            alert("Gagal memuat ayat.");
+        }
+    }
+
+    function renderAyat(ayatList) {
+        const container = document.getElementById('ayat-list-container');
+        // Bismillah handling (kecuali At-Taubah)
+        let html = '';
+        if (STATE.currentSurah.nomor !== 9) {
+            html += `<div style="text-align:center; padding:20px; font-family:'Amiri'; font-size:30px; color:var(--accent-gold);">بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ</div>`;
+        }
+
+        html += ayatList.map((a, index) => {
+            // APPLY TAJWID LOGIC HERE
+            const processedText = STATE.settings.tajwid ? applyTajwidLogic(a.teksArab) : a.teksArab;
+            
+            // Cek Ayat Sajdah
+            const sajdahBadge = (a.teksArab.includes('۩') || (STATE.currentSurah.nomor === 7 && a.nomorAyat === 206)) /* Simplifikasi */ 
+                ? `<span class="sajdah-icon" onclick="alert('Disunnahkan Sujud Tilawah')"><i class="fas fa-kaaba"></i> Ayat Sajdah</span>` : '';
+
+            return `
+            <div class="ayah-container" id="ayah-${index}" data-audio="${a.audio['01'] || a.audio['05']}">
+                <div class="ayah-actions">
+                    <span class="ayah-badge">${STATE.currentSurah.nomor}:${a.nomorAyat} ${sajdahBadge}</span>
+                    <div>
+                        <button class="action-btn" onclick="playAudioFrom(${index})"><i class="fas fa-play"></i></button>
+                        <button class="action-btn" onclick="copyAyat('${a.teksArab}', '${a.teksLatin}', '${a.terjemah}')"><i class="fas fa-copy"></i></button>
+                        <button class="action-btn" onclick="bookmarkAyat(${index})"><i class="fas fa-bookmark"></i></button>
+                    </div>
+                </div>
+                <div class="arabic-text" style="font-weight:${STATE.settings.fontWeight}">${processedText} <span style="color:var(--accent-gold); font-size:0.8em;">۝</span></div>
+                <div class="translation">
+                    <p style="color:var(--accent-gold); font-size:12px; margin-bottom:5px;">${a.teksLatin}</p>
+                    ${a.terjemah}
+                </div>
+            </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = html;
+        
+        // Listener Scroll untuk simpan posisi
+        document.getElementById('app-container').onscroll = function() {
+            localStorage.setItem(`scroll_surah_${STATE.currentSurah.nomor}`, this.scrollTop);
+        };
+    }
+
+    // --- THE "GOD MODE" TAJWID REGEX ENGINE ---
+    function applyTajwidLogic(text) {
+        // 1. Lafadz Allah (Emas)
+        text = text.replace(/(?<!\w)اللّٰه(?!\w)/g, '<span class="t-allah" onclick="showTip(this, \'Lafadz Allah\')">$&</span>');
+        text = text.replace(/(?<!\w)الله(?!\w)/g, '<span class="t-allah" onclick="showTip(this, \'Lafadz Allah\')">$&</span>');
+
+        // 2. Ghunnah (Nun/Mim Tasydid) - Pink
+        text = text.replace(/([نم])[\u0651](?![\u064b-\u0652])/g, '<span class="t-ghunnah" onclick="showTip(this, \'Ghunnah: Dengung Ditahan\')">$&</span>');
+
+        // 3. Qalqalah (Ba, Jim, Dal, Tho, Qof Sukun) - Biru
+        // Konsep: Huruf qalqalah + sukun
+        text = text.replace(/([بجدطق])\u0652/g, '<span class="t-qalqalah" onclick="showTip(this, \'Qalqalah: Pantulkan Suara\')">$&</span>');
+
+        // 4. Mad Wajib/Jaiz (Bendera ~) - Merah
+        text = text.replace(/[\u0653]/g, '<span class="t-mad" onclick="showTip(this, \'Mad Wajib/Jaiz: Panjang 4-5 Harakat\')">$&</span>');
+
+        // 5. Iqlab (Nun Sukun/Tanwin + Ba) - Hijau (Approximation Regex)
+        // Mim kecil biasanya simbol Iqlab unicode \u06E2
+        text = text.replace(/[\u06E2]/g, '<span class="t-iqlab" onclick="showTip(this, \'Iqlab: Ganti ke Mim\')">$&</span>');
+
+        // 6. Ikhfa/Idgham (Approximation for Nun Sukun) - Oranye
+        // Biasa di mushaf indo Nun Sukun kosongan, tapi di text standar ada sukunnya.
+        // Kita warnai Nun Sukun default jadi Oranye (Waspada)
+        text = text.replace(/ن\u0652/g, '<span class="t-ikhfa" onclick="showTip(this, \'Ikhfa/Idgham: Samar/Lebur\')">$&</span>');
+
+        return text;
+    }
+
+    function showTip(el, msg) {
+        const tooltip = document.getElementById('tajwid-tooltip');
+        const rect = el.getBoundingClientRect();
+        
+        tooltip.innerText = msg;
+        tooltip.style.display = 'block';
+        tooltip.style.top = (rect.top - 40) + 'px';
+        tooltip.style.left = (rect.left - 20) + 'px';
+
+        // Haptic
+        if(navigator.vibrate) navigator.vibrate(10);
+
+        setTimeout(() => { tooltip.style.display = 'none'; }, 2500);
+    }
+
+    // --- AUDIO SYSTEM (PERSISTENT & SMART) ---
+    function playAudioFrom(index) {
+        STATE.currentAyahIndex = index;
+        const ayahDiv = document.getElementById(`ayah-${index}`);
+        const audioUrl = ayahDiv.getAttribute('data-audio');
+        
+        const audio = document.getElementById('quran-audio');
+        audio.src = audioUrl;
+        audio.playbackRate = STATE.audioSpeed;
+        audio.play();
+        
+        STATE.audioPlaying = true;
+        updatePlayerUI();
+        highlightAyah(index);
+    }
+
+    function setupAudioEvents() {
+        const audio = document.getElementById('quran-audio');
+        
+        audio.addEventListener('ended', () => {
+            // Auto Next
+            if (STATE.currentAyahIndex < STATE.currentSurah.jumlahAyat - 1) {
+                playAudioFrom(STATE.currentAyahIndex + 1);
+            } else {
+                STATE.audioPlaying = false;
+                updatePlayerUI();
+                alert("Sadaqallahul Adzim - Akhir Surat");
+            }
+        });
+
+        audio.addEventListener('timeupdate', () => {
+            const min = Math.floor(audio.currentTime / 60);
+            const sec = Math.floor(audio.currentTime % 60);
+            document.getElementById('player-timer').innerText = `${min}:${sec < 10 ? '0'+sec : sec}`;
+            document.getElementById('audio-progress').style.width = (audio.currentTime / audio.duration * 100) + '%';
+        });
+    }
+
+    function togglePlay() {
+        const audio = document.getElementById('quran-audio');
+        if (audio.paused) {
+            audio.play();
+            STATE.audioPlaying = true;
+        } else {
+            audio.pause();
+            STATE.audioPlaying = false;
+        }
+        updatePlayerUI();
+    }
+
+    function nextAudio() {
+        if (STATE.currentAyahIndex < STATE.currentSurah.jumlahAyat - 1) playAudioFrom(STATE.currentAyahIndex + 1);
+    }
+    
+    function prevAudio() {
+        if (STATE.currentAyahIndex > 0) playAudioFrom(STATE.currentAyahIndex - 1);
+    }
+
+    function updatePlayerUI() {
+        const bar = document.getElementById('audio-player-bar');
+        const btn = document.getElementById('play-icon');
+        
+        bar.style.display = 'flex';
+        btn.className = STATE.audioPlaying ? 'fas fa-pause' : 'fas fa-play';
+        
+        document.getElementById('player-title').innerText = `${STATE.currentSurah.namaLatin} : ${STATE.currentAyahIndex + 1}`;
+    }
+
+    function highlightAyah(index) {
+        // Hapus highlight lama
+        document.querySelectorAll('.active-ayah').forEach(el => el.classList.remove('active-ayah'));
+        
+        // Tambah baru
+        const el = document.getElementById(`ayah-${index}`);
+        if(el) {
+            el.classList.add('active-ayah');
+            el.scrollIntoView({behavior: "smooth", block: "center"});
+        }
+    }
+
+    function openSpeedMenu() {
+        const newSpeed = prompt("Masukkan Kecepatan Audio (0.5 - 2.0):", STATE.audioSpeed);
+        if (newSpeed && !isNaN(newSpeed)) {
+            STATE.audioSpeed = parseFloat(newSpeed);
+            document.getElementById('quran-audio').playbackRate = STATE.audioSpeed;
+        }
+    }
+
+    // --- FEATURES: UTILS ---
+    
+    // Quick Copy
+    function copyAyat(arab, latin, indo) {
+        const text = `*QS. ${STATE.currentSurah.namaLatin}: ${STATE.currentAyahIndex+1}*\n\n${arab}\n\n${latin}\n\n"${indo}"\n\n_Dikutip dari Rifqy Al-Quran OLED_`;
+        navigator.clipboard.writeText(text);
+        alert("Ayat berhasil disalin rapi!");
+    }
+
+    // WakeLock
+    async function toggleWakeLock() {
+        if ('wakeLock' in navigator) {
+            if (!STATE.wakeLockSentinel) {
+                try {
+                    STATE.wakeLockSentinel = await navigator.wakeLock.request('screen');
+                    alert("Layar akan Selalu Nyala");
+                } catch (err) { console.log(err); }
+            } else {
+                STATE.wakeLockSentinel.release();
+                STATE.wakeLockSentinel = null;
+                alert("Mode Layar Normal");
+            }
+        }
+    }
+
+    // Font Weight
+    function updateFontWeight(val) {
+        STATE.settings.fontWeight = val;
+        document.querySelectorAll('.arabic-text').forEach(el => el.style.fontWeight = val);
+    }
+
+    // Night Vision
+    function toggleNightVision(active) {
+        document.getElementById('night-vision-overlay').style.display = active ? 'block' : 'none';
+    }
+
+    // Settings logic
+    function toggleTajwid() {
+        STATE.settings.tajwid = !STATE.settings.tajwid;
+        // Re-render current ayah if inside surah
+        if (STATE.currentSurah) renderAyat(STATE.currentSurah.ayat);
+    }
+
+    // --- TOOLBOX LOGIC ---
+    
+    // Tasbih
+    let tasbihVal = 0;
+    function countTasbih() {
+        tasbihVal++;
+        document.getElementById('tasbih-count').innerText = tasbihVal;
+        if(navigator.vibrate) navigator.vibrate(15); // Haptic
+    }
+    function resetTasbih() { tasbihVal=0; document.getElementById('tasbih-count').innerText=0; }
+
+    // Zakat
+    function calcZakat() {
+        const val = document.getElementById('zakat-input').value;
+        const zakat = val * 0.025;
+        document.getElementById('zakat-result').innerText = "Rp " + zakat.toLocaleString('id-ID');
+    }
+    const sedekahQuotes = [
+        "Sedekah menghapus dosa sebagaimana air memadamkan api.",
+        "Obatilah orang sakit di antara kalian dengan sedekah.",
+        "Tangan di atas lebih baik daripada tangan di bawah."
+    ];
+    document.getElementById('sedekah-quote').innerText = sedekahQuotes[Math.floor(Math.random()*sedekahQuotes.length)];
+
+    // Doa Loader
+    function loadDoa() {
+        const doas = [
+            {t: "Doa Sebelum Tidur", a: "بِسْمِكَ اللّهُمَّ اَحْيَا وَ بِسْمِكَ اَمُوْتُ"},
+            {t: "Doa Bangun Tidur", a: "الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُورُ"},
+            {t: "Doa Sebelum Makan", a: "اَللّٰهُمَّ بَارِكْ لَنَا فِيْمَا رَزَقْتَنَا وَقِنَا عَذَابَ النَّارِ"},
+            {t: "Doa Selamat Dunia Akhirat", a: "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ"}
+            // Tambahkan ribuan doa disini jika perlu
+        ];
+        document.getElementById('doa-list').innerHTML = doas.map(d => `
+            <div style="background:#1a1a1a; padding:15px; border-bottom:1px solid #333;">
+                <h4 style="color:var(--accent-gold); margin:0;">${d.t}</h4>
+                <p style="font-family:'Amiri'; font-size:20px; text-align:right; margin:10px 0;">${d.a}</p>
+            </div>
+        `).join('');
+    }
+
+    // Prayer Time Calc (Simplifikasi Syuruq Dhuha)
+    function initPrayerTimes() {
+        // Mocking logic (seharusnya pakai API geolocation + calculation complex)
+        // Disini kita pakai data statis + offset waktu untuk demo fungsi
+        const now = new Date();
+        document.getElementById('syuruq-time').innerText = "05:45";
+        document.getElementById('dhuha-time').innerText = "06:15";
+    }
+
+    // Khatam Progress (Simulasi)
+    function checkKhatamProgress() {
+        // Ambil data dari localstorage brp ayat yg dibaca
+        // Disini kita set random 15% untuk demo
+        document.getElementById('khatam-bar').style.width = '15%'; 
+    }
+
+    // Helpers
+    function showView(view) {
+        if(view === 'home') {
+            document.getElementById('view-home').classList.remove('hidden');
+            document.getElementById('view-read').classList.add('hidden');
+            document.getElementById('back-btn').style.display = 'none';
+            document.getElementById('header-text').innerHTML = `<h1>Rifqy Al-Quran</h1><small>${getHijriDate()}</small>`;
+        }
+    }
+    
+    function getHijriDate() {
+        return new Intl.DateTimeFormat('id-ID-u-ca-islamic', {day: 'numeric', month: 'long', year: 'numeric'}).format(Date.now());
+    }
+
+    function openModal(id) { document.getElementById('modal-'+id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById('modal-'+id).style.display = 'none'; }
+    function openSubModal(id) { 
+        closeModal('toolbox');
+        document.getElementById('modal-'+id).style.display = 'flex';
+        if(id === 'doa') loadDoa();
+    }
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active-tab', 'style', 'color:var(--accent-gold)'));
+        if(tab === 'surah') {
+            document.getElementById('surah-list-container').classList.remove('hidden');
+            document.getElementById('juz-list-container').classList.add('hidden');
+        } else {
+            document.getElementById('surah-list-container').classList.add('hidden');
+            document.getElementById('juz-list-container').classList.remove('hidden');
+        }
+    }
+    function loadSettings() {
+        // Load from LS if exists
+    }
+
+</script>
+</body>
+</html>
